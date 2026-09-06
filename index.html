@@ -309,21 +309,32 @@ p.para .first-char{float:left;font-size:52px;line-height:1;padding-right:8px;col
 </main>
 
 <script>
-/* ============ 音乐：mp3 自动播放 + 可暂停 ============ */
+/* ============ 音乐：mp3 自动播放（多触发 + 持续重试）+ 可暂停 ============ */
 const bgm = document.getElementById('bgm');
 const btn = document.getElementById('musicBtn');
 let musicOn = false;
-function play(){ bgm.play().then(()=>{ musicOn=true; btn.classList.add('playing'); }).catch(()=>{}); }
-function pause(){ bgm.pause(); musicOn=false; btn.classList.remove('playing'); }
-btn.addEventListener('click', ()=>{ musicOn ? pause() : play(); });
-// 一滚动（或任何首次交互）就响
-const firstEvents = ['scroll','touchstart','pointerdown','keydown'];
-firstEvents.forEach(ev=>{
-  window.addEventListener(ev, function once(){
-    if(!musicOn) play();
-    firstEvents.forEach(e=>window.removeEventListener(e, once));
-  }, {passive:true});
-});
+
+function tryPlay(){
+  if(musicOn) return;
+  const p = bgm.play();
+  if(p && p.then){
+    p.then(()=>{ musicOn = true; btn.classList.add('playing'); }).catch(()=>{ /* 自动播放被拒，等下次交互再试 */ });
+  } else {
+    musicOn = true; btn.classList.add('playing');
+  }
+}
+function pause(){
+  bgm.pause(); musicOn = false; btn.classList.remove('playing');
+}
+btn.addEventListener('click', ()=>{ if(musicOn) pause(); else tryPlay(); });
+
+// 任何首次交互都尝试播放，直到成功才停止监听
+const evs = ['scroll','touchstart','touchend','pointerdown','click','keydown'];
+function autoPlay(){
+  if(!musicOn) tryPlay();
+  if(musicOn) evs.forEach(e => window.removeEventListener(e, autoPlay));
+}
+evs.forEach(e => window.addEventListener(e, autoPlay, {passive:true}));
 
 /* ============ 滚动淡入 ============ */
 if(!('IntersectionObserver' in window)){ document.querySelectorAll('.reveal').forEach(el=>el.classList.add('in')); }
